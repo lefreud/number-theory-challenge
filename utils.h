@@ -58,7 +58,7 @@ void polynomialDivision(const unsigned int* dividend, const unsigned int* diviso
         int intShift = bitShift / INTEGER_BIT_SIZE;
         for (int k = i; k >= intShift; k--) {
           remainder[k] ^= divisor[k - intShift] << (bitShift % INTEGER_BIT_SIZE);
-          if (k - 1 - intShift >=  0){
+          if (bitShift % 32 != 0 && k - 1 - intShift >= 0){
             remainder[k] ^= divisor[k - 1 - intShift] >> ((INTEGER_BIT_SIZE - bitShift) % INTEGER_BIT_SIZE);
           }
         }

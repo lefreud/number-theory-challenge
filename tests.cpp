@@ -92,6 +92,48 @@ TEST(division, veryBigOperandsRemainder) {
   EXPECT_EQ(quotient[3], 0);
 }
 
+TEST(division, divisionByItself) {
+  int COUNT = 3;
+  auto quotient = new unsigned int[COUNT];
+  auto remainder = new unsigned int[COUNT];
+  auto dividend = new unsigned int[COUNT];
+  dividend[0] = 0b11101010000111100010101010100001;
+  dividend[1] = 0b00101011111001000001101010011111;
+  dividend[2] = 0b00101011110001010010101011101001;
+  auto divisor = new unsigned int[COUNT];
+  divisor[0] = 0b11101010000111100010101010100001;
+  divisor[1] = 0b00101011111001000001101010011111;
+  divisor[2] = 0b00101011110001010010101011101001;
+  polynomialDivision(dividend, divisor, quotient, remainder, COUNT);
+  EXPECT_EQ(remainder[0], 0);
+  EXPECT_EQ(remainder[1], 0);
+  EXPECT_EQ(remainder[2], 0);
+  EXPECT_EQ(quotient[0], 0b1);
+  EXPECT_EQ(quotient[1], 0);
+  EXPECT_EQ(quotient[2], 0);
+}
+
+TEST(division, divisionBy32bitShifted) {
+  int COUNT = 3;
+  auto quotient = new unsigned int[COUNT];
+  auto remainder = new unsigned int[COUNT];
+  auto dividend = new unsigned int[COUNT];
+  dividend[0] = 0b0;
+  dividend[1] = 0b11101010000111100010101010100001;
+  dividend[2] = 0b00101011111001000001101010011111;
+  auto divisor = new unsigned int[COUNT];
+  divisor[0] = 0b11101010000111100010101010100001;
+  divisor[1] = 0b00101011111001000001101010011111;
+  divisor[2] = 0b0;
+  polynomialDivision(dividend, divisor, quotient, remainder, COUNT);
+  EXPECT_EQ(remainder[0], 0);
+  EXPECT_EQ(remainder[1], 0);
+  EXPECT_EQ(remainder[2], 0);
+  EXPECT_EQ(quotient[0], 0);
+  EXPECT_EQ(quotient[1], 0b1);
+  EXPECT_EQ(quotient[2], 0);
+}
+
 TEST(division, smallDividend1) {
   int COUNT = 2;
   auto quotient = new unsigned int[COUNT];
