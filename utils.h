@@ -69,37 +69,74 @@ void polynomialDivision(const unsigned int* dividend, const unsigned int* diviso
     }
   }
 }
-//
-// /**
-// Factors a monic univariate polynomial over a galois field (2).
-// The polynomial x^3 + x^2 + 1 is represented as
-// 0000 0000 0000 0000 0000 0000 0000 1101
-// with an unsigned int.
-// */
-// vector<unsigned int> factorPolynomial(unsigned int polynomial) {
-//   vector<unsigned int> factors;
-//   unsigned int simplifiedPolynomial = polynomial;
-//
-//   // compute x factors
-//   while ((simplifiedPolynomial & 1) == 0) {
-//     simplifiedPolynomial >>= 1;
-//     factors.push_back(0b10); // x factor
-//   }
-//
-//   // compute factors ending with + 1
-//   unsigned int divisor = 0b11;
-//   while (simplifiedPolynomial != 1) {
-//     unsigned int quotient = 0, remainder = 0;
-//     polynomialDivision(simplifiedPolynomial, divisor, quotient, remainder);
-//     if (remainder == 0) {
-//       factors.push_back(divisor);
-//       simplifiedPolynomial = quotient;
-//     } else {
-//       divisor += 0b10;
-//     }
-//   }
-//   return factors;
-// }
+
+/**
+Factors a monic univariate polynomial over a galois field (2).
+The polynomial x^3 + x^2 + 1 is represented as
+0000 0000 0000 0000 0000 0000 0000 1101
+with an unsigned int.
+*/
+vector<unsigned int*> factorPolynomial(const unsigned int* polynomial, int size) {
+  vector<unsigned int*> factors;
+  auto simplifiedPolynomial = new unsigned int[size];
+  for (int i = 0; i < size; i++)
+    simplifiedPolynomial[i] = polynomial[i];
+
+  // compute x factors
+
+  while ((simplifiedPolynomial[0] & 1) == 0) {
+    for (int i = 0; i < size - 1; i++) {
+      simplifiedPolynomial[i] >>= 1;
+      simplifiedPolynomial[i] ^= simplifiedPolynomial[i + 1] << (INTEGER_BIT_SIZE - 1);
+    }
+    simplifiedPolynomial[size - 1] >>= 1;
+    auto factor = new unsigned int[1];
+    factor[0] = 0b10;
+    factors.push_back(factor); // x factor
+  }
+
+  // compute factors ending with + 1
+
+  auto divisor = new unsigned int[size];
+  divisor[0] = 0b11;
+  for (int i = 1; i < size; i++)
+    divisor[i] = 0;
+
+  auto quotient = new unsigned int[size];
+  auto remainder = new unsigned int[size];
+  int w = 0;
+  while (getPolynomialBitSize(simplifiedPolynomial, size) != 1) {
+    w++;
+    if (w % 1000000 == 0)
+      cout << w << endl;
+    polynomialDivision(simplifiedPolynomial, divisor, quotient, remainder, size);
+
+    if (getPolynomialBitSize(remainder, size) == 0) {
+      auto divisorCopy = new unsigned int[size];
+      for (int i = 0; i < size; i++)
+        divisorCopy[i] = divisor[i];
+      factors.push_back(divisorCopy);
+
+      for (int i = 0; i < size; i++)
+        simplifiedPolynomial[i] = quotient[i];
+    } else {
+      // add 0b10 to divisor
+      // Note: no overflow checking
+      unsigned int carry = 1;
+      int currentBit = 1;
+      do {
+        divisor[currentBit / INTEGER_BIT_SIZE] ^= carry << (currentBit % INTEGER_BIT_SIZE);
+        if ((divisor[currentBit / INTEGER_BIT_SIZE] & (1 << (currentBit % INTEGER_BIT_SIZE))) == 0) {
+          carry = 1;
+        } else {
+          carry = 0;
+        }
+        currentBit++;
+      } while (carry != 0);
+    }
+  }
+  return factors;
+}
 //
 // unsigned int *multiplyPolynomials(unsigned int firstPolynomial, unsigned int secondPolynomial) {
 //   int size = 32;
