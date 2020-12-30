@@ -79,6 +79,47 @@ void polynomialModulo(const unsigned int *dividend, const unsigned int *divisor,
   polynomialDivision(dividend, divisor, quotient, remainder, size);
 }
 
+void gaussianElimination(unsigned int** &matrix, int size, int bitSize) {
+  int pivotRow = 0;
+  for (int pivotColumn = bitSize - 1; pivotColumn >= 0; pivotColumn--) {
+    // Find the pivot row and swap it with the current row
+    bool pivotFound = false;
+    for (int row = pivotRow; row < bitSize; row++) {
+      if ((matrix[row][pivotColumn / INTEGER_BIT_SIZE] & (1 << pivotColumn)) != 0) {
+        // swap rows
+        if (row != pivotRow) {
+          auto temporaryRow = new unsigned int[size];
+          for (int j = 0; j < size; j++)
+            temporaryRow[j] = matrix[pivotRow][j];
+          for (int j = 0; j < size; j++)
+            matrix[pivotRow][j] = matrix[row][j];
+          for (int j = 0; j < size; j++)
+            matrix[row][j] = temporaryRow[j];
+        }
+
+        pivotFound = true;
+        break;
+      }
+    }
+
+    // simplify other rows
+    if (pivotFound) {
+      for (int row = 0; row < bitSize; row++) {
+        if (row == pivotRow)
+          continue;
+
+        if ((matrix[row][pivotColumn / INTEGER_BIT_SIZE] & (1 << (pivotColumn % INTEGER_BIT_SIZE))) != 0) {
+          // There's a one in this row's pivot column, eliminate it!!!
+          for (int j = pivotColumn / INTEGER_BIT_SIZE; j >= 0; j--) {
+            matrix[row][j / INTEGER_BIT_SIZE] ^= matrix[pivotRow][j / INTEGER_BIT_SIZE];
+          }
+        }
+      }
+      pivotRow++;
+    }
+  }
+}
+
 vector<unsigned int *> computeBerlekampFactors(const unsigned int *polynomial, int size) {
   int hBitSize = getPolynomialBitSize(polynomial, size) - 1;
 
@@ -121,6 +162,14 @@ vector<unsigned int *> computeBerlekampFactors(const unsigned int *polynomial, i
       }
     }
   }
+
+  // removed flipped identity matrix
+  for (int i = 0; i < hBitSize; i++) {
+    matrix[i][i / INTEGER_BIT_SIZE] ^= (1 << (i % INTEGER_BIT_SIZE));
+  }
+
+  gaussianElimination(matrix, size, hBitSize);
+
   vector<unsigned int*> factors;
   return factors;
 }
