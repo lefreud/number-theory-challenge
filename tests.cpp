@@ -172,6 +172,17 @@ TEST(division, smallDividend2) {
   EXPECT_EQ(quotient[1], 0);
 }
 
+TEST(modulo, small) {
+  int COUNT = 1;
+  auto remainder = new unsigned int[COUNT];
+  auto dividend = new unsigned int[COUNT];
+  dividend[0] = 0b1000000;
+  auto divisor = new unsigned int[COUNT];
+  divisor[0] = 0b110001;
+  polynomialModulo(dividend, divisor, remainder, COUNT);
+  EXPECT_EQ(remainder[0], 0b10011);
+}
+
 TEST(factoring, small1) {
   int COUNT = 1;
   auto polynomial = new unsigned int[COUNT];
@@ -258,8 +269,27 @@ TEST(factoring, codingGameSample) {
   polynomial[0] = 0x46508fb7;
   polynomial[1] = 0x6677e201;
   auto factors = factorPolynomial(polynomial, COUNT);
+  int EXPECTED_FACTORS = 2;
+  vector<unsigned int*> expectedFactors(EXPECTED_FACTORS);
+  for (int i = 0; i < EXPECTED_FACTORS; i++)
+    expectedFactors[i] = new unsigned int[1];
+
+  expectedFactors[0][0] = 0xb0c152f9;
+  expectedFactors[0][1] = 0;
+  expectedFactors[1][0] = 0xebf2831f;
+  expectedFactors[1][1] = 0;
+  for (int i = 0; i < EXPECTED_FACTORS; i++)
+    EXPECT_EQ(factors[i][0], expectedFactors[i][0]);
+}
+
+TEST(factoring, codingGameTest1) {
+  int COUNT = 2;
+  auto polynomial = new unsigned int[COUNT];
+  polynomial[0] = 0x000073af;
+  polynomial[1] = 0x00000000;
+  auto factors = factorPolynomial(polynomial, COUNT);
   for (auto & factor : factors) {
-    cout << factor << endl;
+    cout << factor[0] << " " << factor[1] << endl;
   }
   // int EXPECTED_FACTORS = 4;
   // vector<unsigned int*> expectedFactors(EXPECTED_FACTORS);
@@ -272,4 +302,24 @@ TEST(factoring, codingGameSample) {
   // expectedFactors[3][0] = 0b11001011;
   // for (int i = 0; i < EXPECTED_FACTORS; i++)
   //   EXPECT_EQ(factors[i][0], expectedFactors[i][0]);
+}
+
+
+
+TEST(berlekamp, small1) {
+  int COUNT = 1;
+  auto polynomial = new unsigned int[COUNT];
+  polynomial[0] = 0b110001;
+  auto factors = computeBerlekampFactors(polynomial, COUNT);
+
+  int EXPECTED_FACTORS = 2;
+  vector<unsigned int*> expectedFactors(EXPECTED_FACTORS);
+  for (int i = 0; i < EXPECTED_FACTORS; i++)
+    expectedFactors[i] = new unsigned int[1];
+
+  expectedFactors[0][0] = 0b111;
+  expectedFactors[1][0] = 0b1011;
+  for (int i = 0; i < EXPECTED_FACTORS; i++)
+    EXPECT_EQ(factors[i][0], expectedFactors[i][0]);
+  EXPECT_EQ(factors.size(), EXPECTED_FACTORS);
 }
