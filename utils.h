@@ -9,12 +9,12 @@ using namespace std;
 
 const int INTEGER_BIT_SIZE = sizeof(unsigned int) * 8;
 
-int getPolynomialBitSize(const unsigned int* polynomial, int size) {
+int getPolynomialBitSize(const unsigned int *polynomial, int size) {
   int bitSize = INTEGER_BIT_SIZE * size;
 
   int firstSignificantInt = size - 1;
   // remove leading integers containing only zeros
-  for ( ; firstSignificantInt >= 0; firstSignificantInt--) {
+  for (; firstSignificantInt >= 0; firstSignificantInt--) {
     if (polynomial[firstSignificantInt] == 0) {
       bitSize -= sizeof(unsigned int) * 8;
     } else {
@@ -37,7 +37,11 @@ int getPolynomialBitSize(const unsigned int* polynomial, int size) {
   return bitSize;
 }
 
-void polynomialDivision(const unsigned int* dividend, const unsigned int* divisor, unsigned int* &quotient, unsigned int* &remainder, int size) {
+void polynomialDivision(const unsigned int *dividend,
+                        const unsigned int *divisor,
+                        unsigned int *&quotient,
+                        unsigned int *&remainder,
+                        int size) {
   for (int i = 0; i < size; i++) {
     quotient[i] = 0;
     remainder[i] = dividend[i];
@@ -58,7 +62,7 @@ void polynomialDivision(const unsigned int* dividend, const unsigned int* diviso
         int intShift = bitShift / INTEGER_BIT_SIZE;
         for (int k = i; k >= intShift; k--) {
           remainder[k] ^= divisor[k - intShift] << (bitShift % INTEGER_BIT_SIZE);
-          if (bitShift % 32 != 0 && k - 1 - intShift >= 0){
+          if (bitShift % 32 != 0 && k - 1 - intShift >= 0) {
             remainder[k] ^= divisor[k - 1 - intShift] >> ((INTEGER_BIT_SIZE - bitShift) % INTEGER_BIT_SIZE);
           }
         }
@@ -70,14 +74,65 @@ void polynomialDivision(const unsigned int* dividend, const unsigned int* diviso
   }
 }
 
+void polynomialModulo(const unsigned int *dividend, const unsigned int *divisor, unsigned int *&remainder, int size) {
+  auto quotient = new unsigned int[size];
+  polynomialDivision(dividend, divisor, quotient, remainder, size);
+}
+
+vector<unsigned int *> computeBerlekampFactors(const unsigned int *polynomial, int size) {
+  int hBitSize = getPolynomialBitSize(polynomial, size) - 1;
+
+  // init matrix
+  auto matrix = new unsigned int *[hBitSize];
+  for (int i = 0; i < hBitSize; i++) {
+    matrix[i] = new unsigned int[size];
+    for (int j = 0; j < size; j++) {
+      matrix[i][j] = 0;
+    }
+  }
+
+  for (int i = 0; i < hBitSize; i++) {
+    // initialize the power of x
+    auto xPower = new unsigned int[size];
+    for (int j = 0; j < size; j++) {
+      xPower[j] = 0;
+    }
+    int power = i * 2;
+
+    // modulo f
+    if (power + 1 < getPolynomialBitSize(polynomial, size)) {
+      xPower[power / INTEGER_BIT_SIZE] = 1 << (power % INTEGER_BIT_SIZE);
+    } else if (power + 1 > getPolynomialBitSize(polynomial, size)) {
+      xPower[power / INTEGER_BIT_SIZE] = 1 << (power % INTEGER_BIT_SIZE);
+      auto remainder = new unsigned int[size];
+      polynomialModulo(xPower, polynomial, remainder, size);
+      for (int j = 0; j < size; j++) {
+        xPower[j] = remainder[j];
+      }
+    } else {
+      // same degree, xPower must be zero.
+    }
+
+    // add to matrix
+    for (int j = 0; j < hBitSize; j++) {
+      if (j == 0 || (xPower[j / INTEGER_BIT_SIZE] >> (j - 1) >= 0b10)) {
+        matrix[j][i / INTEGER_BIT_SIZE] ^=
+            ((xPower[j / INTEGER_BIT_SIZE] >> (j % INTEGER_BIT_SIZE)) & 1) << (i % INTEGER_BIT_SIZE);
+      }
+    }
+  }
+  vector<unsigned int*> factors;
+  return factors;
+}
+
 /**
 Factors a monic univariate polynomial over a galois field (2).
 The polynomial x^3 + x^2 + 1 is represented as
 0000 0000 0000 0000 0000 0000 0000 1101
 with an unsigned int.
 */
-vector<unsigned int*> factorPolynomial(const unsigned int* polynomial, int size) {
-  vector<unsigned int*> factors;
+vector<unsigned int *> factorPolynomial(const unsigned int *polynomial, int size) {
+  vector<unsigned int *> factors;
   auto simplifiedPolynomial = new unsigned int[size];
   for (int i = 0; i < size; i++)
     simplifiedPolynomial[i] = polynomial[i];
