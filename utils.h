@@ -111,7 +111,7 @@ void gaussianElimination(unsigned int** &matrix, int size, int bitSize) {
         if ((matrix[row][pivotColumn / INTEGER_BIT_SIZE] & (1 << (pivotColumn % INTEGER_BIT_SIZE))) != 0) {
           // There's a one in this row's pivot column, eliminate it!!!
           for (int j = pivotColumn / INTEGER_BIT_SIZE; j >= 0; j--) {
-            matrix[row][j / INTEGER_BIT_SIZE] ^= matrix[pivotRow][j / INTEGER_BIT_SIZE];
+            matrix[row][j] ^= matrix[pivotRow][j];
           }
         }
       }
