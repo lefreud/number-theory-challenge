@@ -5,6 +5,8 @@
 #ifndef CPP__UTILS_H_
 #define CPP__UTILS_H_
 
+# include <bitset>
+
 using namespace std;
 
 const int INTEGER_BIT_SIZE = sizeof(unsigned int) * 8;
@@ -120,6 +122,13 @@ void gaussianElimination(unsigned int** &matrix, int size, int bitSize) {
   }
 }
 
+/**
+ * Factorizes a polynomial in GF(2).
+ *
+ * @param polynomial A squarefree polynomial. Must have twice the size it needs
+ * @param size Must be twice the size of the actual polynomial
+ * @return two factors
+ */
 vector<unsigned int *> computeBerlekampFactors(const unsigned int *polynomial, int size) {
   int hBitSize = getPolynomialBitSize(polynomial, size) - 1;
 
@@ -140,18 +149,13 @@ vector<unsigned int *> computeBerlekampFactors(const unsigned int *polynomial, i
     }
     int power = i * 2;
 
-    // modulo f
-    if (power + 1 < getPolynomialBitSize(polynomial, size)) {
-      xPower[power / INTEGER_BIT_SIZE] = 1 << (power % INTEGER_BIT_SIZE);
-    } else if (power + 1 > getPolynomialBitSize(polynomial, size)) {
-      xPower[power / INTEGER_BIT_SIZE] = 1 << (power % INTEGER_BIT_SIZE);
-      auto remainder = new unsigned int[size];
-      polynomialModulo(xPower, polynomial, remainder, size);
-      for (int j = 0; j < size; j++) {
-        xPower[j] = remainder[j];
-      }
-    } else {
-      // same degree, xPower must be zero.
+    xPower[power / INTEGER_BIT_SIZE] = 1 << (power % INTEGER_BIT_SIZE);
+
+    auto remainder = new unsigned int[size];
+    polynomialModulo(xPower, polynomial, remainder, size);
+
+    for (int j = 0; j < size; j++) {
+      xPower[j] = remainder[j];
     }
 
     // add to matrix
