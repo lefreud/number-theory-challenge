@@ -81,7 +81,7 @@ void polynomialModulo(const unsigned int *dividend, const unsigned int *divisor,
   polynomialDivision(dividend, divisor, quotient, remainder, size);
 }
 
-void gaussianElimination(unsigned int** &matrix, int size, int bitSize) {
+void gaussianElimination(unsigned int **&matrix, int size, int bitSize) {
   int pivotRow = 0;
   for (int pivotColumn = bitSize - 1; pivotColumn >= 0; pivotColumn--) {
     // Find the pivot row and swap it with the current row
@@ -97,6 +97,7 @@ void gaussianElimination(unsigned int** &matrix, int size, int bitSize) {
             matrix[pivotRow][j] = matrix[row][j];
           for (int j = 0; j < size; j++)
             matrix[row][j] = temporaryRow[j];
+          delete[] temporaryRow;
         }
 
         pivotFound = true;
@@ -120,6 +121,102 @@ void gaussianElimination(unsigned int** &matrix, int size, int bitSize) {
       pivotRow++;
     }
   }
+}
+
+unsigned int getBinaryParity(const unsigned int *sequence, int size) {
+  unsigned int parity = 0;
+  for (int bitIndex = 0; bitIndex < size * INTEGER_BIT_SIZE; bitIndex++) {
+    if ((sequence[bitIndex / INTEGER_BIT_SIZE] & (1 << (bitIndex % INTEGER_BIT_SIZE))) != 0) {
+      parity ^= 1;
+    }
+  }
+  return parity;
+}
+/**
+ * Finds a vector from the null space of a matrix.
+ *
+ * @param rrefMatrix Reduced row echelon form binary matrix
+ * @param size integers per row
+ * @param bitSize matrix dimension
+ * @return A vector in the null space
+ */
+unsigned int *findVectorFromNullSpace(unsigned int **rrefMatrix, int size, int bitSize) {
+  unsigned int choicesMatrix[bitSize][size];
+  for (int row = 0; row < bitSize; row++) {
+    for (int j = 0; j < size; j++) {
+      choicesMatrix[row][j] = rrefMatrix[row][j];
+    }
+  }
+
+  unsigned int mustBeZeros[size];
+  unsigned int mustBeOnes[size];
+  for (int i = 0; i < size; i++) {
+    mustBeOnes[i] = 0;
+    mustBeZeros[i] = 0;
+  }
+
+  for (int row = 0; row < bitSize; row++) {
+    unsigned int usedOnes[size];
+    for (int j = 0; j < size; j++)
+      usedOnes[j] = rrefMatrix[row][j] & mustBeOnes[j];
+    unsigned int usedOnesParity = getBinaryParity(usedOnes, size);
+
+    // set bits that must be zero to zero
+    for (int j = 0; j < size; j++) {
+      choicesMatrix[row][j] &= ~mustBeZeros[j];
+      choicesMatrix[row][j] &= ~mustBeOnes[j];
+    }
+    unsigned int choicesParity = getBinaryParity(choicesMatrix[row], size);
+    unsigned int rowParity = choicesParity ^usedOnesParity;
+
+    if (rowParity != 0) {
+      for (int column = 0; column < bitSize; column++) {
+        if ((choicesMatrix[row][column / INTEGER_BIT_SIZE] & (1 << (column % INTEGER_BIT_SIZE))) != 0) {
+          mustBeZeros[column / INTEGER_BIT_SIZE] ^= 1 << (column % INTEGER_BIT_SIZE);
+          choicesMatrix[row][column / INTEGER_BIT_SIZE] ^= 1 << (column % INTEGER_BIT_SIZE);
+          break;
+        }
+      }
+    }
+    for (int j = 0; j < size; j++) {
+      mustBeOnes[j] |= choicesMatrix[row][j];
+    }
+  }
+
+  auto vectorFromNullSpace = new unsigned int[size];
+  for (int i = 0; i < size; i++)
+    vectorFromNullSpace[i] = mustBeOnes[i];
+  return vectorFromNullSpace;
+}
+
+/**
+ * Finds the greatest common divisor between two polynomials. First must be greater than second.
+ * Euclide algo
+ */
+unsigned int *gcd(const unsigned int *first, const unsigned int *second, int size) {
+  // init
+  auto dividend = new unsigned int[size];
+  auto divisor = new unsigned int[size];
+  auto quotient = new unsigned int[size];
+  auto remainder = new unsigned int[size];
+  for (int i = 0; i < size; i++) {
+    dividend[i] = first[i];
+    divisor[i] = second[i];
+    quotient[i] = 0;
+    remainder[i] = first[i];
+  }
+
+  while (true) {
+    polynomialDivision(dividend, divisor, quotient, remainder, size);
+    if (getPolynomialBitSize(remainder, size) == 0)
+      break;
+
+    for (int i = 0; i < size; i++)
+      dividend[i] = divisor[i];
+    for (int i = 0; i < size; i++)
+      divisor[i] = remainder[i];
+  }
+  return divisor;
 }
 
 /**
@@ -158,6 +255,7 @@ vector<unsigned int *> computeBerlekampFactors(const unsigned int *polynomial, i
       xPower[j] = remainder[j];
     }
 
+    // delete[] remainder;
     // add to matrix
     for (int j = 0; j < hBitSize; j++) {
       if (j == 0 || (xPower[j / INTEGER_BIT_SIZE] >> (j - 1) >= 0b10)) {
@@ -174,7 +272,18 @@ vector<unsigned int *> computeBerlekampFactors(const unsigned int *polynomial, i
 
   gaussianElimination(matrix, size, hBitSize);
 
-  vector<unsigned int*> factors;
+  // Find two vectors from null space
+  unsigned int *vectorsFromNullSpace[2];
+  vectorsFromNullSpace[0] = findVectorFromNullSpace(matrix, size, hBitSize);
+  // Second vector is the first one + 1
+  vectorsFromNullSpace[1] = new unsigned int[size];
+  for (int i = 0; i < size; i++)
+    vectorsFromNullSpace[1][i] = vectorsFromNullSpace[0][i];
+  vectorsFromNullSpace[1][0] ^= 1;
+
+  vector<unsigned int *> factors;
+  factors.push_back(gcd(polynomial, vectorsFromNullSpace[0], size));
+  factors.push_back(gcd(polynomial, vectorsFromNullSpace[1], size));
   return factors;
 }
 
@@ -245,7 +354,7 @@ vector<unsigned int *> factorPolynomial(const unsigned int *polynomial, int size
   }
   return factors;
 }
-//
+/*//
 // unsigned int *multiplyPolynomials(unsigned int firstPolynomial, unsigned int secondPolynomial) {
 //   int size = 32;
 //   auto *product = new unsigned int[size / 2];
@@ -299,6 +408,6 @@ vector<unsigned int *> factorPolynomial(const unsigned int *polynomial, int size
 //   deconvoluted.push_back(firstPossibility);
 //   deconvoluted.push_back(secondPossibility);
 //   return deconvoluted;
-// }
+// }*/
 
 #endif //CPP__UTILS_H_
