@@ -11,6 +11,13 @@ using namespace std;
 
 const int INTEGER_BIT_SIZE = sizeof(unsigned int) * 8;
 
+void displayPolynomial(const unsigned int* polynomial, int size) {
+  for (int j = size - 1; j >= 0; j--) {
+    cout << bitset<32>(polynomial[j]);
+  }
+  cout << endl;
+}
+
 int getPolynomialBitSize(const unsigned int *polynomial, int size) {
   int bitSize = INTEGER_BIT_SIZE * size;
 
