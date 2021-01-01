@@ -253,7 +253,7 @@ vector<unsigned int *> computeBerlekampFactors(const unsigned int *polynomial, i
 
   for (int i = 0; i < hBitSize; i++) {
     // initialize the power of x
-    auto xPower = new unsigned int[size];
+    unsigned int xPower[size];
     for (int j = 0; j < size; j++) {
       xPower[j] = 0;
     }
@@ -267,12 +267,12 @@ vector<unsigned int *> computeBerlekampFactors(const unsigned int *polynomial, i
     for (int j = 0; j < size; j++) {
       xPower[j] = remainder[j];
     }
+    delete[] remainder;
 
-    // delete[] remainder;
     // add to matrix
     for (int j = 0; j < hBitSize; j++) {
-        matrix[j][i / INTEGER_BIT_SIZE] ^=
-            ((xPower[j / INTEGER_BIT_SIZE] >> (j % INTEGER_BIT_SIZE)) & 1) << (i % INTEGER_BIT_SIZE);
+      matrix[j][i / INTEGER_BIT_SIZE] ^=
+          ((xPower[j / INTEGER_BIT_SIZE] >> (j % INTEGER_BIT_SIZE)) & 1) << (i % INTEGER_BIT_SIZE);
     }
   }
 
@@ -295,6 +295,12 @@ vector<unsigned int *> computeBerlekampFactors(const unsigned int *polynomial, i
   vector<unsigned int *> factors;
   factors.push_back(gcd(polynomial, vectorsFromNullSpace[0], size));
   factors.push_back(gcd(polynomial, vectorsFromNullSpace[1], size));
+
+  // cleanup matrix
+  for (int i = 0; i < hBitSize; i++) {
+    delete[] matrix[i];
+  }
+
   return factors;
 }
 
