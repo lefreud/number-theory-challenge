@@ -128,6 +128,12 @@ void gaussianElimination(unsigned int **&matrix, int size, int bitSize) {
       pivotRow++;
     }
   }
+  // for (int i = 0; i < bitSize; i++) {
+  //   for (int j = size - 1; j >= 0; j--) {
+  //     cout << bitset<32>(matrix[i][j]);
+  //   }
+  //   cout << endl;
+  // }
 }
 
 unsigned int getBinaryParity(const unsigned int *sequence, int size) {
@@ -292,6 +298,115 @@ vector<unsigned int *> computeBerlekampFactors(const unsigned int *polynomial, i
   factors.push_back(gcd(polynomial, vectorsFromNullSpace[0], size));
   factors.push_back(gcd(polynomial, vectorsFromNullSpace[1], size));
   return factors;
+}
+
+unsigned int *getFormalDerivative(const unsigned int *polynomial, int size) {
+  auto derivative = new unsigned int[size];
+
+  // shift bits by one position to the right
+  for (int i = 0; i < size; i++) {
+    if (polynomial[i] > 1)
+      derivative[i] = polynomial[i] >> 1;
+    else
+      derivative[i] = 0;
+
+    if (i < size - 1 && (polynomial[i + 1] & 1) == 1) {
+      derivative[i] ^= polynomial[i + 1] << (INTEGER_BIT_SIZE - 1);
+    }
+  }
+
+  // only even powers should be kept
+  unsigned int bitMask = 0;
+  for (int i = 0; i < INTEGER_BIT_SIZE; i += 2)
+    bitMask ^= 1 << i;
+
+  for (int i = 0; i < size; i++) {
+    derivative[i] &= bitMask;
+  }
+  return derivative;
+}
+
+unsigned int *getSquareRoot(const unsigned int *polynomial, int size) {
+  auto squareRoot = new unsigned int[size];
+  for (int i = 0; i < size; i++)
+    squareRoot[i] = 0;
+
+  for (int i = 0; i < size * INTEGER_BIT_SIZE; i += 2) {
+    auto originalBit = (1 << (i % INTEGER_BIT_SIZE)) & polynomial[i / INTEGER_BIT_SIZE];
+    if (originalBit)
+      squareRoot[(i / 2) / INTEGER_BIT_SIZE] |= 1 << ((i / 2) % INTEGER_BIT_SIZE);
+  }
+
+  return squareRoot;
+}
+
+/**
+ * Returns a vector of squarefree polynomials composing the input polynomial.
+ *
+ * Reference:
+ * https://en.wikipedia.org/wiki/Factorization_of_polynomials_over_finite_fields#Square-free_factorization
+ *
+ * @param polynomial The initial polynomial
+ * @param size The size of the polynomial
+ * @return The squarefree polynomials
+ */
+multimap<int, pair<unsigned int *, int>> getSquareFreeDecomposition(const unsigned int *polynomial, int size) {
+  // TODO: w not vector
+  vector<unsigned int *> w;
+
+  // R
+  multimap<int, pair<unsigned int *, int>> squareFreeFactors; // polysize, <poly, multiplicity>
+
+  // c <- gcd(f, f')
+  vector<unsigned int *> c;
+  auto polynomialDerivative = getFormalDerivative(polynomial, size);
+  auto c0 = gcd(polynomial, polynomialDerivative, size);
+  c.push_back(c0);
+
+  // w <- f/c
+  auto w1 = new unsigned int[size];
+  auto remainder = new unsigned int[size];
+  polynomialDivision(polynomial, c[0], w1, remainder, size);
+  w.push_back(w1);
+
+  int multiplicity = 1;
+
+  while (getPolynomialBitSize(w[w.size() - 1], size) != 1) {
+    // y <- gcd(w, c)
+    auto y = gcd(w[w.size() - 1], c[c.size() - 1], size);
+
+    // fac <- w/y
+    auto fac = new unsigned int[size];
+    polynomialDivision(w[w.size() - 1], y, fac, remainder, size);
+
+    // R <- R . fac^i
+    // don't add one
+    if (getPolynomialBitSize(fac, size) != 1)
+      squareFreeFactors.emplace(getPolynomialBitSize(fac, size), make_pair(fac, multiplicity));
+
+    // w <- y
+    w.push_back(y);
+
+    // c <- c/y
+    auto cTemp = new unsigned int[size];
+    polynomialDivision(c[c.size() - 1], y, cTemp, remainder, size);
+    c.push_back(cTemp);
+
+    multiplicity += 1;
+  }
+
+  if (getPolynomialBitSize(c[c.size() - 1], size) != 1) {
+    auto cNext = getSquareRoot(c[c.size() - 1], size);
+    c.push_back(cNext);
+    auto additionalFactors = getSquareFreeDecomposition(c[c.size() - 1], size);
+    for (auto &additionalFactor:additionalFactors) {
+      int actualMultiplicity = additionalFactor.second.second * 2;
+      squareFreeFactors.emplace(additionalFactor.first, make_pair(additionalFactor.second.first, actualMultiplicity));
+    }
+  }
+
+  // can we return vector?
+  return squareFreeFactors;
 }
 
 /**
