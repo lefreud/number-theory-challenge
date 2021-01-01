@@ -6,6 +6,8 @@
 #define CPP__UTILS_H_
 
 # include <bitset>
+#include <map>
+#include <set>
 
 using namespace std;
 
@@ -45,6 +47,25 @@ int getPolynomialBitSize(const unsigned int *polynomial, int size) {
   bitSize -= leadingZeros;
   return bitSize;
 }
+
+bool isLessThan(const unsigned int *firstPolynomial, const unsigned int *secondPolynomial, int size) {
+  for (int i = 0; i < size; i++) {
+    if (firstPolynomial[i] > secondPolynomial[i]) {
+      return false;
+    } else if (secondPolynomial[i] > firstPolynomial[i]) {
+      return true;
+    }
+  }
+
+  // exactly the same polynomial
+  return true;
+}
+
+struct PolynomialComparator {
+  bool operator() (const pair<unsigned int*, int> a, const pair<unsigned int*, int> b) const {
+    return isLessThan(a.first, b.first, a.second);
+  }
+};
 
 void polynomialDivision(const unsigned int *dividend,
                         const unsigned int *divisor,
@@ -86,6 +107,7 @@ void polynomialDivision(const unsigned int *dividend,
 void polynomialModulo(const unsigned int *dividend, const unsigned int *divisor, unsigned int *&remainder, int size) {
   auto quotient = new unsigned int[size];
   polynomialDivision(dividend, divisor, quotient, remainder, size);
+  delete[] quotient;
 }
 
 void gaussianElimination(unsigned int **&matrix, int size, int bitSize) {
@@ -128,12 +150,6 @@ void gaussianElimination(unsigned int **&matrix, int size, int bitSize) {
       pivotRow++;
     }
   }
-  // for (int i = 0; i < bitSize; i++) {
-  //   for (int j = size - 1; j >= 0; j--) {
-  //     cout << bitset<32>(matrix[i][j]);
-  //   }
-  //   cout << endl;
-  // }
 }
 
 unsigned int getBinaryParity(const unsigned int *sequence, int size) {
@@ -229,6 +245,9 @@ unsigned int *gcd(const unsigned int *first, const unsigned int *second, int siz
     for (int i = 0; i < size; i++)
       divisor[i] = remainder[i];
   }
+  delete[] dividend;
+  delete[] quotient;
+  delete[] remainder;
   return divisor;
 }
 
@@ -237,7 +256,7 @@ unsigned int *gcd(const unsigned int *first, const unsigned int *second, int siz
  *
  * @param polynomial A squarefree polynomial. Must have twice the size it needs
  * @param size Must be twice the size of the actual polynomial
- * @return two factors
+ * @return two factors, sorted from smaller to bigger
  */
 vector<unsigned int *> computeBerlekampFactors(const unsigned int *polynomial, int size) {
   int hBitSize = getPolynomialBitSize(polynomial, size) - 1;
@@ -251,6 +270,7 @@ vector<unsigned int *> computeBerlekampFactors(const unsigned int *polynomial, i
     }
   }
 
+  // compute the initial matrix
   for (int i = 0; i < hBitSize; i++) {
     // initialize the power of x
     unsigned int xPower[size];
@@ -293,8 +313,16 @@ vector<unsigned int *> computeBerlekampFactors(const unsigned int *polynomial, i
   vectorsFromNullSpace[1][0] ^= 1;
 
   vector<unsigned int *> factors;
-  factors.push_back(gcd(polynomial, vectorsFromNullSpace[0], size));
-  factors.push_back(gcd(polynomial, vectorsFromNullSpace[1], size));
+  auto firstFactor = gcd(polynomial, vectorsFromNullSpace[0], size);
+  auto secondFactor = gcd(polynomial, vectorsFromNullSpace[1], size);
+
+  if (isLessThan(firstFactor, secondFactor, size)) {
+    factors.push_back(secondFactor);
+    factors.push_back(firstFactor);
+  } else {
+    factors.push_back(firstFactor);
+    factors.push_back(secondFactor);
+  }
 
   // cleanup matrix
   for (int i = 0; i < hBitSize; i++) {
@@ -302,6 +330,71 @@ vector<unsigned int *> computeBerlekampFactors(const unsigned int *polynomial, i
   }
 
   return factors;
+}
+
+/**
+Factors a monic univariate polynomial over a galois field (2).
+The polynomial x^3 + x^2 + 1 is represented as
+0000 0000 0000 0000 0000 0000 0000 1101
+with an unsigned int.
+*/
+multiset<pair<unsigned int *, int>, PolynomialComparator> decode(const unsigned int *polynomial, int size) {
+  multiset<pair<unsigned int *, int>, PolynomialComparator> outputs;
+
+  // If the original polynomial fits in an integer, add it as a factor
+  if (getPolynomialBitSize(polynomial, size) <= INTEGER_BIT_SIZE) {
+    auto neutralFactor = new unsigned int[size];
+    auto polynomialCopy = new unsigned int[size];
+
+    neutralFactor[0] = 1;
+    for (int i = 1; i < size; i++)
+      neutralFactor[i] = 0;
+
+    for (int i = 0; i < size; i++)
+      polynomialCopy[i] = polynomial[i];
+
+    // merge neutral term and original poly
+    auto outputNeutralFirst = new unsigned int[size];
+    auto outputPolynomialCopyFirst = new unsigned int[size];
+    for (int i = 0; i < size / 2; i++) {
+      outputNeutralFirst[i] = neutralFactor[i];
+      outputPolynomialCopyFirst[i] = polynomialCopy[i];
+    }
+    for (int i = size / 2; i < size; i++) {
+      outputNeutralFirst[i] = polynomialCopy[i - size / 2];
+      outputPolynomialCopyFirst[i] = neutralFactor[i - size / 2];
+    }
+
+    outputs.emplace(outputNeutralFirst, size);
+    outputs.emplace(outputPolynomialCopyFirst, size);
+  }
+
+  int paddedSize = 2 * size;
+  auto paddedPolynomial = new unsigned int[paddedSize];
+  for (int i = 0; i < size; i++)
+    paddedPolynomial[i] = polynomial[i];
+  for (int i = size; i < paddedSize; i++)
+    paddedPolynomial[i] = 0;
+
+  auto paddedFactors = computeBerlekampFactors(paddedPolynomial, paddedSize);
+
+  // for (auto &paddedFactor : paddedFactors)
+  //   outputs.emplace(paddedFactor, size);
+  auto outputA = new unsigned int[size];
+  auto outputB = new unsigned int[size];
+
+  for (int i = 0; i < size/2; i++) {
+    outputA[i] = paddedFactors[0][i];
+    outputB[i] = paddedFactors[1][i];
+  }
+  for (int i = size/2; i < size; i++) {
+    outputA[i] = paddedFactors[1][i - size / 2];
+    outputB[i] = paddedFactors[0][i - size / 2];
+  }
+  outputs.emplace(outputA, size);
+  outputs.emplace(outputB, size);
+
+  return outputs;
 }
 
 unsigned int *getFormalDerivative(const unsigned int *polynomial, int size) {
@@ -480,60 +573,5 @@ vector<unsigned int *> factorPolynomial(const unsigned int *polynomial, int size
   }
   return factors;
 }
-/*//
-// unsigned int *multiplyPolynomials(unsigned int firstPolynomial, unsigned int secondPolynomial) {
-//   int size = 32;
-//   auto *product = new unsigned int[size / 2];
-//
-//   for (int i = 0; i < size / 16; i++) {
-//     product[i] = 0;
-//   }
-//   for (int i = 0; i < size; i++) {
-//     for (int j = 0; j < size; j++) {
-//       // b[(i + j) / 32] ^= ( (a[i / 32] >> (i % 32)) &
-//       //      (a[j / 32 + size / 32] >> (j % 32)) & 1 ) << ((i + j) % 32);   // Magic centaurian operation
-//
-//       // simplified version
-//       product[(i + j) / 32] ^= ((firstPolynomial >> i) & (secondPolynomial >> j) & 1) << ((i + j) % 32);
-//     }
-//   }
-//   return product;
-// }
-//
-// vector<unsigned int*> blindDeconvolution(unsigned int polynomial, int factorMaxSizes) {
-//   auto factors = factorPolynomial(polynomial);
-//
-//   unsigned int leftPolynomial1 = 1, rightPolynomial1 = 1;
-//   for (size_t i = factors.size() - 1; i >= 1; i--) {
-//     if (getPolynomialBitSize(factors[i]) + getPolynomialBitSize(leftPolynomial1) - 1 < factorMaxSizes) {
-//       auto product = multiplyPolynomials(leftPolynomial1, factors[i]);
-//       leftPolynomial1 = product[0];
-//     } else if (getPolynomialBitSize(factors[i]) + getPolynomialBitSize(rightPolynomial1) - 1 < factorMaxSizes) {
-//       auto product = multiplyPolynomials(rightPolynomial1, factors[i]);
-//       rightPolynomial1 = product[0];
-//     } else {
-//       // ambiguity
-//       cout << "unexpected ambiguity" << endl;
-//       cout << factors[i] << endl;
-//     }
-//   }
-//
-//   // Last and ambiguous factor
-//
-//   vector<unsigned int*> deconvoluted;
-//   auto firstPossibility = new unsigned int[2];
-//   auto product = multiplyPolynomials(leftPolynomial1, factors[0]);
-//   firstPossibility[0] = product[0];
-//   firstPossibility[1] = rightPolynomial1;
-//
-//   auto secondPossibility = new unsigned int[2];
-//   product = multiplyPolynomials(rightPolynomial1, factors[0]);
-//   secondPossibility[0] = leftPolynomial1;
-//   secondPossibility[1] = product[0];
-//
-//   deconvoluted.push_back(firstPossibility);
-//   deconvoluted.push_back(secondPossibility);
-//   return deconvoluted;
-// }*/
 
 #endif //CPP__UTILS_H_
