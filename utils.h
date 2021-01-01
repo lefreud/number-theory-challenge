@@ -271,10 +271,8 @@ vector<unsigned int *> computeBerlekampFactors(const unsigned int *polynomial, i
     // delete[] remainder;
     // add to matrix
     for (int j = 0; j < hBitSize; j++) {
-      if (j == 0 || (xPower[j / INTEGER_BIT_SIZE] >> (j - 1) >= 0b10)) {
         matrix[j][i / INTEGER_BIT_SIZE] ^=
             ((xPower[j / INTEGER_BIT_SIZE] >> (j % INTEGER_BIT_SIZE)) & 1) << (i % INTEGER_BIT_SIZE);
-      }
     }
   }
 
