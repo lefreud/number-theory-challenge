@@ -13,7 +13,7 @@ using namespace std;
 
 const int INTEGER_BIT_SIZE = sizeof(unsigned int) * 8;
 
-void displayPolynomial(const unsigned int* polynomial, int size) {
+void displayPolynomial(const unsigned int *polynomial, int size) {
   for (int j = size - 1; j >= 0; j--) {
     cout << bitset<32>(polynomial[j]);
   }
@@ -119,14 +119,13 @@ void gaussianElimination(unsigned int **&matrix, int size, int bitSize) {
       if ((matrix[row][pivotColumn / INTEGER_BIT_SIZE] & (1 << pivotColumn)) != 0) {
         // swap rows
         if (row != pivotRow) {
-          auto temporaryRow = new unsigned int[size];
+          unsigned int temporaryRow[size];
           for (int j = 0; j < size; j++)
             temporaryRow[j] = matrix[pivotRow][j];
           for (int j = 0; j < size; j++)
             matrix[pivotRow][j] = matrix[row][j];
           for (int j = 0; j < size; j++)
             matrix[row][j] = temporaryRow[j];
-          delete[] temporaryRow;
         }
 
         pivotFound = true;
@@ -378,8 +377,6 @@ multiset<pair<unsigned int *, int>, PolynomialComparator> decode(const unsigned 
 
   auto paddedFactors = computeBerlekampFactors(paddedPolynomial, paddedSize);
 
-  // for (auto &paddedFactor : paddedFactors)
-  //   outputs.emplace(paddedFactor, size);
   auto outputA = new unsigned int[size];
   auto outputB = new unsigned int[size];
 
@@ -506,72 +503,19 @@ multimap<int, pair<unsigned int *, int>> getSquareFreeDecomposition(const unsign
   return squareFreeFactors;
 }
 
-/**
-Factors a monic univariate polynomial over a galois field (2).
-The polynomial x^3 + x^2 + 1 is represented as
-0000 0000 0000 0000 0000 0000 0000 1101
-with an unsigned int.
-*/
-vector<unsigned int *> factorPolynomial(const unsigned int *polynomial, int size) {
-  vector<unsigned int *> factors;
-  auto simplifiedPolynomial = new unsigned int[size];
-  for (int i = 0; i < size; i++)
-    simplifiedPolynomial[i] = polynomial[i];
+unsigned int *multiplyPolynomials(unsigned int *firstPolynomial, unsigned int *secondPolynomial, int size) {
+  auto *product = new unsigned int[size];
 
-  // compute x factors
-
-  while ((simplifiedPolynomial[0] & 1) == 0) {
-    for (int i = 0; i < size - 1; i++) {
-      simplifiedPolynomial[i] >>= 1;
-      simplifiedPolynomial[i] ^= simplifiedPolynomial[i + 1] << (INTEGER_BIT_SIZE - 1);
-    }
-    simplifiedPolynomial[size - 1] >>= 1;
-    auto factor = new unsigned int[1];
-    factor[0] = 0b10;
-    factors.push_back(factor); // x factor
+  for (int i = 0; i < size; i++) {
+    product[i] = 0;
   }
-
-  // compute factors ending with + 1
-
-  auto divisor = new unsigned int[size];
-  divisor[0] = 0b11;
-  for (int i = 1; i < size; i++)
-    divisor[i] = 0;
-
-  auto quotient = new unsigned int[size];
-  auto remainder = new unsigned int[size];
-  int w = 0;
-  while (getPolynomialBitSize(simplifiedPolynomial, size) != 1) {
-    w++;
-    if (w % 1000000 == 0)
-      cout << w << endl;
-    polynomialDivision(simplifiedPolynomial, divisor, quotient, remainder, size);
-
-    if (getPolynomialBitSize(remainder, size) == 0) {
-      auto divisorCopy = new unsigned int[size];
-      for (int i = 0; i < size; i++)
-        divisorCopy[i] = divisor[i];
-      factors.push_back(divisorCopy);
-
-      for (int i = 0; i < size; i++)
-        simplifiedPolynomial[i] = quotient[i];
-    } else {
-      // add 0b10 to divisor
-      // Note: no overflow checking
-      unsigned int carry = 1;
-      int currentBit = 1;
-      do {
-        divisor[currentBit / INTEGER_BIT_SIZE] ^= carry << (currentBit % INTEGER_BIT_SIZE);
-        if ((divisor[currentBit / INTEGER_BIT_SIZE] & (1 << (currentBit % INTEGER_BIT_SIZE))) == 0) {
-          carry = 1;
-        } else {
-          carry = 0;
-        }
-        currentBit++;
-      } while (carry != 0);
+  for (int i = 0; i < size * INTEGER_BIT_SIZE; i++) {
+    for (int j = 0; j < size * INTEGER_BIT_SIZE; j++) {
+      product[(i + j) / INTEGER_BIT_SIZE] ^= ((firstPolynomial[i / INTEGER_BIT_SIZE] >> (i % INTEGER_BIT_SIZE))
+          & (secondPolynomial[j / INTEGER_BIT_SIZE] >> (j % INTEGER_BIT_SIZE)) & 1) << ((i + j) % 32);
     }
   }
-  return factors;
+  return product;
 }
 
 #endif //CPP__UTILS_H_
